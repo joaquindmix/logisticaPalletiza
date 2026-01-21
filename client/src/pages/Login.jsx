@@ -19,7 +19,8 @@ const Login = () => {
             if (userData.role === 'admin') navigate('/admin');
             else navigate('/client');
         } else {
-            setError(res.error);
+            // Detailed debug info
+            setError(typeof res.error === 'object' ? JSON.stringify(res.error) : res.error);
         }
     };
 

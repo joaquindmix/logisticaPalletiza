@@ -28,7 +28,10 @@ export const AuthProvider = ({ children }) => {
             setUser(userData);
             return { success: true };
         } catch (error) {
-            return { success: false, error: error.response?.data?.error || 'Login failed' };
+            console.error("Login Error:", error);
+            const status = error.response ? error.response.status : 'Network Error';
+            const data = error.response ? error.response.data : error.message;
+            return { success: false, error: `Status: ${status} - Data: ${JSON.stringify(data)}` };
         }
     };
 

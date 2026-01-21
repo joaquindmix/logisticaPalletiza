@@ -11,6 +11,21 @@ const SECRET_KEY = 'super_secret_key_mvp'; // In production use ENV
 app.use(cors());
 app.use(express.json());
 
+// DEBUG: Log all requests
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+
+// Health Check
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        uptime: process.uptime(),
+        db_path: db.filename // exposing path for debug
+    });
+});
+
 // Middleware to verify Token
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
