@@ -1,4 +1,13 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
+
+// DIAGNOSTIC: Write file immediately to prove file execution
+try {
+    fs.writeFileSync(path.join(__dirname, '../server_startup_log.txt'), `Server.js Started at ${new Date().toISOString()}\n`);
+} catch (e) {
+    console.error("Startup log failed", e);
+}
 const cors = require('cors');
 const db = require('./db');
 const bcrypt = require('bcrypt');
