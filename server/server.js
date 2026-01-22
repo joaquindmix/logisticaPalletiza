@@ -21,7 +21,7 @@ app.use(cors());
 app.use(express.json());
 
 // DEBUG: Log all requests
-const fs = require('fs');
+
 app.use((req, res, next) => {
     const logMessage = `[${new Date().toISOString()}] ${req.method} ${req.url}\n`;
     console.log(logMessage.trim());
@@ -186,7 +186,6 @@ app.get('/api/client/inventory', authenticateToken, (req, res) => {
 });
 
 // Serve Static files from React App (Production)
-const path = require('path');
 app.use(express.static(path.join(__dirname, '../client/dist')));
 
 // Handle React routing, return all requests to React app

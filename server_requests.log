@@ -1,0 +1,17 @@
+[2026-01-22T20:38:45.524Z] POST /api/login
+[2026-01-22T20:38:45.583Z] GET /api/admin/inventory
+[2026-01-22T20:38:45.587Z] GET /api/admin/inventory
+[2026-01-22T20:38:48.593Z] GET /api/admin/resources
+[2026-01-22T20:38:51.931Z] GET /api/admin/resources
+[2026-01-22T20:39:07.678Z] POST /api/admin/clients
+[2026-01-22T20:39:10.449Z] GET /api/admin/resources
+[2026-01-22T20:39:26.774Z] POST /api/admin/inventory
+[2026-01-22T20:39:49.117Z] POST /api/admin/products
+[2026-01-22T20:39:49.137Z] GET /api/admin/resources
+[2026-01-22T20:39:50.538Z] GET /api/admin/resources
+[2026-01-22T20:39:55.203Z] GET /api/admin/inventory
+[2026-01-22T20:40:05.665Z] GET /api/admin/resources
+[2026-01-22T20:40:08.074Z] GET /api/admin/inventory
+[2026-01-22T20:40:21.296Z] GET /api/admin/resources
+[2026-01-22T20:40:35.573Z] POST /api/admin/inventory
+[2026-01-22T20:40:36.814Z] GET /api/admin/inventory

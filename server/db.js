@@ -1,18 +1,88 @@
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 const bcrypt = require('bcrypt');
 const path = require('path');
 
-// Connect to SQLite database
+// Connect to SQLite database using Better-SQLite3
 const dbPath = path.resolve(__dirname, 'logistica.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error('Error opening database', err);
-    } else {
-        console.log('Connected to SQLite database.');
-        initializeSchemas();
-    }
-});
+const actualDb = new Database(dbPath, { verbose: console.log });
+console.log('Connected to SQLite database (Better-SQLite3 Adapter).');
 
+// Create a wrapper to mimic sqlite3 API for existing routes
+const db = {
+    // Mimic db.serialize (just execute callback immediately as better-sqlite3 is sync)
+    serialize: (callback) => {
+        if (callback) callback();
+    },
+
+    // Mimic db.run(sql, params, callback)
+    run: function (sql, params, callback) {
+        if (typeof params === 'function') {
+            callback = params;
+            params = [];
+        }
+        params = params || [];
+        try {
+            const stmt = actualDb.prepare(sql);
+            const info = stmt.run(...params);
+            // sqlite3 passes 'this' with lastID and changes to the callback
+            if (callback) {
+                callback.call({ lastID: info.lastInsertRowid, changes: info.changes }, null);
+            }
+        } catch (err) {
+            if (callback) callback(err);
+            else console.error('DB Run Error:', err);
+        }
+        return this;
+    },
+
+    // Mimic db.get(sql, params, callback)
+    get: function (sql, params, callback) {
+        if (typeof params === 'function') {
+            callback = params;
+            params = [];
+        }
+        params = params || [];
+        try {
+            const stmt = actualDb.prepare(sql);
+            const row = stmt.get(...params);
+            if (callback) callback(null, row);
+        } catch (err) {
+            if (callback) callback(err);
+            else console.error('DB Get Error:', err);
+        }
+        return this;
+    },
+
+    // Mimic db.all(sql, params, callback)
+    all: function (sql, params, callback) {
+        if (typeof params === 'function') {
+            callback = params;
+            params = [];
+        }
+        params = params || [];
+        try {
+            const stmt = actualDb.prepare(sql);
+            const rows = stmt.all(...params);
+            if (callback) callback(null, rows);
+        } catch (err) {
+            if (callback) callback(err);
+            else console.error('DB All Error:', err);
+        }
+        return this;
+    },
+
+    // Expose close
+    close: (callback) => {
+        try {
+            actualDb.close();
+            if (callback) callback(null);
+        } catch (err) {
+            if (callback) callback(err);
+        }
+    }
+};
+
+// Initialize Schemas (using the wrapper to ensure it works)
 function initializeSchemas() {
     db.serialize(() => {
         // Clients/Users Table
@@ -45,12 +115,12 @@ function initializeSchemas() {
             FOREIGN KEY (product_id) REFERENCES products(id),
             FOREIGN KEY (client_id) REFERENCES clients(id)
         )`);
-        
+
         // Seed Admin User if not exists
         db.get("SELECT * FROM clients WHERE email = ?", ['admin@logistica.com'], (err, row) => {
             if (!row) {
                 const hash = bcrypt.hashSync('admin123', 10);
-                db.run("INSERT INTO clients (name, email, password, role) VALUES (?, ?, ?, ?)", 
+                db.run("INSERT INTO clients (name, email, password, role) VALUES (?, ?, ?, ?)",
                     ['Admin', 'admin@logistica.com', hash, 'admin']);
                 console.log("Admin user created.");
             }
@@ -58,18 +128,21 @@ function initializeSchemas() {
 
         // Seed some demo client and products
         db.get("SELECT count(*) as count FROM clients", [], (err, row) => {
-            if (row.count <= 1) { // Only admin exists
-                 const hash = bcrypt.hashSync('client123', 10);
-                 db.run("INSERT INTO clients (name, email, password, role) VALUES (?, ?, ?, ?)", 
+            if (row && row.count <= 1) { // Only admin exists
+                const hash = bcrypt.hashSync('client123', 10);
+                db.run("INSERT INTO clients (name, email, password, role) VALUES (?, ?, ?, ?)",
                     ['Cliente Demo', 'cliente@demo.com', hash, 'client']);
 
-                 db.run("INSERT INTO products (sku, name, description, weight) VALUES (?, ?, ?, ?)", 
+                db.run("INSERT INTO products (sku, name, description, weight) VALUES (?, ?, ?, ?)",
                     ['PRD001', 'Impresora Laser', 'Impresora de alta velocidad', 15.5]);
-                 db.run("INSERT INTO products (sku, name, description, weight) VALUES (?, ?, ?, ?)", 
+                db.run("INSERT INTO products (sku, name, description, weight) VALUES (?, ?, ?, ?)",
                     ['PRD002', 'Caja Bobinas', 'Bobinas de papel industrial', 500.0]);
             }
         });
     });
 }
+
+// Initialize immediately
+initializeSchemas();
 
 module.exports = db;

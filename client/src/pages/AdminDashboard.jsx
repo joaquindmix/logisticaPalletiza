@@ -11,6 +11,7 @@ const AdminDashboard = () => {
     // Keep forms same as before just restyled
     const [inboundForm, setInboundForm] = useState({ product_id: '', client_id: '', quantity: '', location: '', pallet_type: 'Standard' });
     const [clientForm, setClientForm] = useState({ name: '', email: '', password: '' });
+    const [productForm, setProductForm] = useState({ sku: '', name: '', description: '', weight: '' });
 
     useEffect(() => {
         if (activeTab === 'inventory') fetchInventory();
@@ -31,6 +32,10 @@ const AdminDashboard = () => {
     const handleCreateClient = async (e) => {
         e.preventDefault();
         try { await api.post('/admin/clients', clientForm); alert('Cliente creado!'); setClientForm({ name: '', email: '', password: '' }); } catch (err) { alert('Error creating client'); }
+    };
+    const handleCreateProduct = async (e) => {
+        e.preventDefault();
+        try { await api.post('/admin/products', productForm); alert('Producto creado!'); setProductForm({ sku: '', name: '', description: '', weight: '' }); fetchResources(); } catch (err) { alert('Error creating product'); }
     };
     const handleOutbound = async (id, currentQty) => {
         const removeQty = prompt(`Cantidad actual: ${currentQty}. Cuánto retirar?`);
@@ -55,6 +60,7 @@ const AdminDashboard = () => {
                 <nav className="space-y-1 flex-1">
                     <SidebarItem active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} icon={<LayoutDashboard size={20} />} label="Inventario Global" />
                     <SidebarItem active={activeTab === 'inbound'} onClick={() => setActiveTab('inbound')} icon={<ArrowDownCircle size={20} />} label="Ingreso Mercadería" />
+                    <SidebarItem active={activeTab === 'products'} onClick={() => setActiveTab('products')} icon={<Package size={20} />} label="Gestión Productos" />
                     <SidebarItem active={activeTab === 'clients'} onClick={() => setActiveTab('clients')} icon={<Users size={20} />} label="Gestión Clientes" />
                 </nav>
 
@@ -88,6 +94,7 @@ const AdminDashboard = () => {
                         <h1 className="text-3xl font-bold text-white mb-2">
                             {activeTab === 'inventory' && 'Inventario Global'}
                             {activeTab === 'inbound' && 'Ingreso de Mercadería'}
+                            {activeTab === 'products' && 'Gestión de Productos'}
                             {activeTab === 'clients' && 'Gestión de Clientes'}
                         </h1>
                         <p className="text-slate-400">Administra el stock y los movimientos del depósito.</p>
@@ -210,6 +217,33 @@ const AdminDashboard = () => {
                             </form>
                         </div>
                     )}
+
+                    {activeTab === 'products' && (
+                        <div className="glass-card max-w-xl mx-auto rounded-xl p-8 border border-slate-800">
+                            <h3 className="text-xl font-bold mb-6 text-white">Nuevo Producto</h3>
+                            <form onSubmit={handleCreateProduct} className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">SKU</label>
+                                    <input type="text" className="input-field" value={productForm.sku} onChange={e => setProductForm({ ...productForm, sku: e.target.value })} required />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Nombre</label>
+                                    <input type="text" className="input-field" value={productForm.name} onChange={e => setProductForm({ ...productForm, name: e.target.value })} required />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Descripción</label>
+                                    <input type="text" className="input-field" value={productForm.description} onChange={e => setProductForm({ ...productForm, description: e.target.value })} />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Peso (kg)</label>
+                                    <input type="number" step="0.1" className="input-field" value={productForm.weight} onChange={e => setProductForm({ ...productForm, weight: e.target.value })} required />
+                                </div>
+                                <button type="submit" className="btn-primary !bg-indigo-600 !from-indigo-600 !to-blue-600 hover:!from-indigo-500">
+                                    Crear Producto
+                                </button>
+                            </form>
+                        </div>
+                    )}
                 </div>
             </main>
         </div>
@@ -220,8 +254,8 @@ const SidebarItem = ({ active, onClick, icon, label }) => (
     <button
         onClick={onClick}
         className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${active
-                ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-sm'
-                : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+            ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-sm'
+            : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
             }`}
     >
         {icon}
