@@ -4,7 +4,7 @@
     "description": "Root package for deployment",
     "main": "index.js",
     "scripts": {
-        "postinstall": "npm install --prefix client && npm install --prefix server && npm run build --prefix client",
+        "postinstall": "npm install --prefix server",
         "start": "node server/server.js",
         "dev": "concurrently \"npm run dev --prefix client\" \"npm run dev --prefix server\""
     },
