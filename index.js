@@ -1,26 +1,13 @@
-const http = require('http');
-
-const PORT = process.env.PORT || 3001;
-
-const server = http.createServer((req, res) => {
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'text/plain');
-    res.end('Node.js is running! Routing is working.');
-});
-
-server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
-
-/* 
-// ORIGINAL CODE - COMMENTED OUT FOR DEBUGGING
 const fs = require('fs');
 const path = require('path');
 
+// Defined logger to capture startup errors
 const logPath = path.join(__dirname, 'server_error.log');
 
 function logError(type, error) {
-    const message = `[${new Date().toISOString()}] ${type}: ${error.message || error}\n${error.stack || ''}\n`;
+    const timestamp = new Date().toISOString();
+    const message = `[${timestamp}] ${type}: ${error.message || error}\n${error.stack || ''}\n`;
+    console.error(message); // Log to console too
     try {
         fs.appendFileSync(logPath, message);
     } catch (fsErr) {
@@ -28,16 +15,21 @@ function logError(type, error) {
     }
 }
 
+// Global handlers for uncaught issues
 process.on('uncaughtException', (err) => {
     logError('Uncaught Exception', err);
     process.exit(1);
 });
 
+process.on('unhandledRejection', (reason, promise) => {
+    logError('Unhandled Rejection', reason);
+});
+
 try {
-    console.log("Starting server from index.js...");
+    console.log("Starting production server...");
+    // Require the actual server implementation
     require('./server/server.js');
 } catch (err) {
     logError('Startup Error', err);
     throw err;
 }
-*/
