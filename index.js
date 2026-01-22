@@ -1,6 +1,12 @@
 const fs = require('fs');
 const path = require('path');
 
+try {
+    fs.writeFileSync(path.join(__dirname, 'server_startup_log.txt'), `Started at ${new Date().toISOString()}\n`);
+} catch (e) {
+    // ignore
+}
+
 // Defined logger to capture startup errors
 const logPath = path.join(__dirname, 'server_error.log');
 
