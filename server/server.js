@@ -12,8 +12,15 @@ app.use(cors());
 app.use(express.json());
 
 // DEBUG: Log all requests
+const fs = require('fs');
 app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    const logMessage = `[${new Date().toISOString()}] ${req.method} ${req.url}\n`;
+    console.log(logMessage.trim());
+    try {
+        fs.appendFileSync(path.join(__dirname, '../server_requests.log'), logMessage);
+    } catch (e) {
+        // ignore log error
+    }
     next();
 });
 
