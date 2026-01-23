@@ -13,6 +13,8 @@ const AdminDashboard = () => {
     const [clientForm, setClientForm] = useState({ name: '', email: '', password: '' });
     const [productForm, setProductForm] = useState({ sku: '', name: '', description: '', weight: '' });
 
+    const [outboundModal, setOutboundModal] = useState({ isOpen: false, item: null, quantity: '' });
+
     useEffect(() => {
         if (activeTab === 'inventory') fetchInventory();
         if (activeTab === 'inbound') fetchResources();
@@ -37,13 +39,34 @@ const AdminDashboard = () => {
         e.preventDefault();
         try { await api.post('/admin/products', productForm); alert('Producto creado!'); setProductForm({ sku: '', name: '', description: '', weight: '' }); fetchResources(); } catch (err) { alert('Error creating product'); }
     };
-    const handleOutbound = async (id, currentQty) => {
-        const removeQty = prompt(`Cantidad actual: ${currentQty}. Cuánto retirar?`);
-        if (!removeQty) return;
-        const qty = parseInt(removeQty);
-        if (isNaN(qty) || qty > currentQty) return alert('Cantidad inválida');
-        const item = inventory.find(i => i.id === id);
-        try { await api.put(`/admin/inventory/${id}`, { quantity: currentQty - qty, location: item.location, pallet_type: item.pallet_type }); fetchInventory(); } catch (err) { alert('Error outbound'); }
+
+    // Open Modal
+    const handleOpenOutbound = (item) => {
+        setOutboundModal({ isOpen: true, item: item, quantity: '' });
+    };
+
+    // Confirm Withdrawal
+    const handleConfirmOutbound = async (e) => {
+        e.preventDefault();
+        const { item, quantity } = outboundModal;
+        if (!item) return;
+
+        const removeQty = parseInt(quantity);
+        if (isNaN(removeQty) || removeQty <= 0 || removeQty > item.quantity) {
+            return alert('Cantidad inválida');
+        }
+
+        try {
+            await api.put(`/admin/inventory/${item.id}`, {
+                quantity: item.quantity - removeQty,
+                location: item.location,
+                pallet_type: item.pallet_type
+            });
+            fetchInventory();
+            setOutboundModal({ isOpen: false, item: null, quantity: '' });
+        } catch (err) {
+            alert('Error outbound');
+        }
     };
 
     return (
@@ -88,7 +111,7 @@ const AdminDashboard = () => {
             </div>
 
             {/* Main Content */}
-            <main className="flex-1 p-6 md:p-10 pt-20 md:pt-10 overflow-auto">
+            <main className="flex-1 p-6 md:p-10 pt-20 md:pt-10 overflow-auto relative">
                 <div className="max-w-6xl mx-auto animate-fade-in">
                     <header className="mb-8">
                         <h1 className="text-3xl font-bold text-white mb-2">
@@ -132,7 +155,7 @@ const AdminDashboard = () => {
                                                 </td>
                                                 <td className="p-5 text-right font-bold text-emerald-400">{item.quantity}</td>
                                                 <td className="p-5 text-right">
-                                                    <button onClick={() => handleOutbound(item.id, item.quantity)} className="text-slate-500 hover:text-red-400 transition-colors p-2 rounded -mr-2 bg-transparent hover:bg-white/5">
+                                                    <button onClick={() => handleOpenOutbound(item)} className="text-slate-500 hover:text-red-400 transition-colors p-2 rounded -mr-2 bg-transparent hover:bg-white/5" title="Retirar Salida">
                                                         <ArrowRightCircle size={18} />
                                                     </button>
                                                 </td>
@@ -245,6 +268,53 @@ const AdminDashboard = () => {
                         </div>
                     )}
                 </div>
+
+                {/* MODAL DE RETIRO - FIXED POSITION */}
+                {outboundModal.isOpen && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOutboundModal({ ...outboundModal, isOpen: false })}></div>
+                        <div className="relative glass-card w-full max-w-md p-6 rounded-xl border border-slate-700 shadow-2xl animate-fade-in">
+                            <h3 className="text-xl font-bold text-white mb-2">Registrar Salida</h3>
+                            <p className="text-sm text-slate-400 mb-6">
+                                Producto: <span className="text-indigo-400 font-mono">{outboundModal.item?.product_name}</span> <br />
+                                Stock Actual: <span className="text-emerald-400 font-bold">{outboundModal.item?.quantity}</span>
+                            </p>
+
+                            <form onSubmit={handleConfirmOutbound} className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Cantidad a Retirar</label>
+                                    <input
+                                        type="number"
+                                        autoFocus
+                                        className="input-field text-lg"
+                                        placeholder="0"
+                                        max={outboundModal.item?.quantity}
+                                        min="1"
+                                        value={outboundModal.quantity}
+                                        onChange={e => setOutboundModal({ ...outboundModal, quantity: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="flex gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setOutboundModal({ ...outboundModal, isOpen: false })}
+                                        className="flex-1 px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors text-sm font-medium"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/20 text-sm font-bold transition-all"
+                                    >
+                                        Confirmar Salida
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
             </main>
         </div>
     );
