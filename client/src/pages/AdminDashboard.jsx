@@ -10,7 +10,8 @@ const AdminDashboard = () => {
     const [resources, setResources] = useState({ clients: [], products: [] });
     // Keep forms same as before just restyled
     const [inboundForm, setInboundForm] = useState({ product_id: '', client_id: '', quantity: '', location: '', pallet_type: 'Standard' });
-    const [clientForm, setClientForm] = useState({ name: '', email: '', password: '' });
+    const [clientForm, setClientForm] = useState({ name: '', email: '', password: '', cuit: '' });
+    const [editingClient, setEditingClient] = useState(null);
     const [productForm, setProductForm] = useState({ sku: '', name: '', description: '', weight: '' });
 
     const [outboundModal, setOutboundModal] = useState({ isOpen: false, item: null, quantity: '', error: '', isSubmitting: false });
@@ -38,6 +39,27 @@ const AdminDashboard = () => {
     const handleCreateProduct = async (e) => {
         e.preventDefault();
         try { await api.post('/admin/products', productForm); alert('Producto creado!'); setProductForm({ sku: '', name: '', description: '', weight: '' }); fetchResources(); } catch (err) { alert('Error creating product'); }
+    };
+
+    const handleDeleteClient = async (id) => {
+        if (!confirm('¿Seguro que deseas eliminar este cliente?')) return;
+        try {
+            await api.delete(`/admin/clients/${id}`);
+            fetchResources();
+        } catch (err) {
+            alert('Error al eliminar cliente');
+        }
+    };
+
+    const handleUpdateClient = async (e) => {
+        e.preventDefault();
+        try {
+            await api.put(`/admin/clients/${editingClient.id}`, editingClient);
+            setEditingClient(null);
+            fetchResources();
+        } catch (err) {
+            alert('Error al actualizar cliente');
+        }
     };
 
     // Open Modal
@@ -223,25 +245,84 @@ const AdminDashboard = () => {
                     )}
 
                     {activeTab === 'clients' && (
-                        <div className="glass-card max-w-xl mx-auto rounded-xl p-8 border border-slate-800">
-                            <h3 className="text-xl font-bold mb-6 text-white">Nuevo Cliente</h3>
-                            <form onSubmit={handleCreateClient} className="space-y-4">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase">Nombre Empresa</label>
-                                    <input type="text" className="input-field" value={clientForm.name} onChange={e => setClientForm({ ...clientForm, name: e.target.value })} required />
+                        <div className="space-y-6">
+                            {/* Create Client Form */}
+                            <div className="glass-card max-w-4xl mx-auto rounded-xl p-8 border border-slate-800">
+                                <h3 className="text-xl font-bold mb-6 text-white flex items-center gap-2">
+                                    <PlusCircle size={20} />
+                                    Nuevo Cliente
+                                </h3>
+                                <form onSubmit={handleCreateClient} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase">Nombre Empresa</label>
+                                        <input type="text" className="input-field" value={clientForm.name} onChange={e => setClientForm({ ...clientForm, name: e.target.value })} required />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase">CUIT</label>
+                                        <input type="text" className="input-field" placeholder="20-12345678-9" value={clientForm.cuit} onChange={e => setClientForm({ ...clientForm, cuit: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase">Email</label>
+                                        <input type="email" className="input-field" value={clientForm.email} onChange={e => setClientForm({ ...clientForm, email: e.target.value })} required />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase">Password</label>
+                                        <input type="password" className="input-field" value={clientForm.password} onChange={e => setClientForm({ ...clientForm, password: e.target.value })} required />
+                                    </div>
+                                    <div className="md:col-span-2 pt-2">
+                                        <button type="submit" className="btn-primary !bg-emerald-600 !from-emerald-600 !to-teal-600 hover:!from-emerald-500 w-full md:w-auto">
+                                            Crear Cliente
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            {/* Clients List Table */}
+                            <div className="glass-card max-w-4xl mx-auto rounded-xl overflow-hidden border border-slate-800">
+                                <div className="p-4 border-b border-slate-800 bg-slate-900/50">
+                                    <h3 className="font-bold text-white">Listado de Clientes</h3>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase">Email</label>
-                                    <input type="email" className="input-field" value={clientForm.email} onChange={e => setClientForm({ ...clientForm, email: e.target.value })} required />
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider bg-slate-900/50">
+                                                <th className="p-4 font-semibold">Empresa</th>
+                                                <th className="p-4 font-semibold">CUIT</th>
+                                                <th className="p-4 font-semibold">Email</th>
+                                                <th className="p-4 font-semibold text-right">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-800">
+                                            {resources.clients.map(client => (
+                                                <tr key={client.id} className="hover:bg-slate-800/30 transition-colors">
+                                                    <td className="p-4 font-medium text-slate-200">{client.name}</td>
+                                                    <td className="p-4 text-sm text-slate-400 font-mono">{client.cuit || '-'}</td>
+                                                    <td className="p-4 text-sm text-slate-400">{client.email}</td>
+                                                    <td className="p-4 text-right flex justify-end gap-2">
+                                                        <button
+                                                            onClick={() => setEditingClient(client)}
+                                                            className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-indigo-400 text-xs font-medium border border-slate-700 transition-colors"
+                                                        >
+                                                            Editar
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteClient(client.id)}
+                                                            className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-red-400 text-xs font-medium border border-slate-700 transition-colors"
+                                                        >
+                                                            Eliminar
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {resources.clients.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="4" className="p-8 text-center text-slate-500">No hay clientes registrados.</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase">Password</label>
-                                    <input type="password" className="input-field" value={clientForm.password} onChange={e => setClientForm({ ...clientForm, password: e.target.value })} required />
-                                </div>
-                                <button type="submit" className="btn-primary !bg-emerald-600 !from-emerald-600 !to-teal-600 hover:!from-emerald-500">
-                                    Crear Cliente
-                                </button>
-                            </form>
+                            </div>
                         </div>
                     )}
 
@@ -325,6 +406,62 @@ const AdminDashboard = () => {
                                         ) : (
                                             <>Confirmar Salida</>
                                         )}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* EDIT CLIENT MODAL */}
+                {editingClient && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingClient(null)}></div>
+                        <div className="relative glass-card w-full max-w-md p-6 rounded-xl border border-slate-700 shadow-2xl animate-fade-in">
+                            <h3 className="text-xl font-bold text-white mb-6">Editar Cliente</h3>
+                            <form onSubmit={handleUpdateClient} className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Nombre</label>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        value={editingClient.name}
+                                        onChange={e => setEditingClient({ ...editingClient, name: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">CUIT</label>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        value={editingClient.cuit || ''}
+                                        onChange={e => setEditingClient({ ...editingClient, cuit: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Email</label>
+                                    <input
+                                        type="email"
+                                        className="input-field"
+                                        value={editingClient.email}
+                                        onChange={e => setEditingClient({ ...editingClient, email: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="flex gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingClient(null)}
+                                        className="flex-1 px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors text-sm font-medium"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-900/20 text-sm font-bold transition-all"
+                                    >
+                                        Guardar Cambios
                                     </button>
                                 </div>
                             </form>

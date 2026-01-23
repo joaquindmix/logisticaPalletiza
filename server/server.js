@@ -105,14 +105,40 @@ app.post('/api/admin/inventory', authenticateToken, (req, res) => {
 // Create Client
 app.post('/api/admin/clients', authenticateToken, (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
-    const { name, email, password } = req.body;
+    const { name, email, password, cuit } = req.body;
     const hash = bcrypt.hashSync(password, 10);
 
-    db.run("INSERT INTO clients (name, email, password, role) VALUES (?, ?, ?, 'client')",
-        [name, email, hash], function (err) {
+    db.run("INSERT INTO clients (name, email, password, role, cuit) VALUES (?, ?, ?, 'client', ?)",
+        [name, email, hash, cuit], function (err) {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ id: this.lastID, message: "Client created" });
         });
+});
+
+// Update Client
+app.put('/api/admin/clients/:id', authenticateToken, (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    const id = req.params.id;
+    const { name, email, cuit } = req.body; // Password update deliberately omitted for simplicity for now
+
+    db.run("UPDATE clients SET name = ?, email = ?, cuit = ? WHERE id = ?",
+        [name, email, cuit, id], function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ message: "Client updated" });
+        });
+});
+
+// Delete Client
+app.delete('/api/admin/clients/:id', authenticateToken, (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    const id = req.params.id;
+
+    // Optional: Check if integrity/foreign key constraints allow deletion.
+    // SQLite enforces FK if enabled, but we might want to just try delete.
+    db.run("DELETE FROM clients WHERE id = ?", [id], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: "Client deleted" });
+    });
 });
 
 // Create Product
@@ -155,7 +181,7 @@ app.get('/api/admin/resources', authenticateToken, (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
 
     const data = {};
-    db.all("SELECT id, name FROM clients WHERE role = 'client'", [], (err, clients) => {
+    db.all("SELECT id, name, email, cuit FROM clients WHERE role = 'client'", [], (err, clients) => {
         if (err) return res.status(500).json({ error: err.message });
         data.clients = clients;
 

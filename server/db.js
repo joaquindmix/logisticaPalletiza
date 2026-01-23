@@ -126,12 +126,25 @@ function initializeSchemas() {
             }
         });
 
+        // MIGRATION: Check and add 'cuit' column if not exists
+        db.all("PRAGMA table_info(clients)", [], (err, columns) => {
+            if (columns) {
+                const hasCuit = columns.some(col => col.name === 'cuit');
+                if (!hasCuit) {
+                    console.log("Migrating: Adding 'cuit' column to clients table...");
+                    db.run("ALTER TABLE clients ADD COLUMN cuit TEXT");
+                }
+            }
+        });
+
         // Seed some demo client and products
         db.get("SELECT count(*) as count FROM clients", [], (err, row) => {
             if (row && row.count <= 1) { // Only admin exists
                 const hash = bcrypt.hashSync('client123', 10);
-                db.run("INSERT INTO clients (name, email, password, role) VALUES (?, ?, ?, ?)",
-                    ['Cliente Demo', 'cliente@demo.com', hash, 'client']);
+                // Note: Seed data won't have CUIT initially unless we update this line too, but it's fine for existing db.
+                // We'll insert without CUIT for now or add a dummy one if we want.
+                db.run("INSERT INTO clients (name, email, password, role, cuit) VALUES (?, ?, ?, ?, ?)",
+                    ['Cliente Demo', 'cliente@demo.com', hash, 'client', '20-12345678-9']);
 
                 db.run("INSERT INTO products (sku, name, description, weight) VALUES (?, ?, ?, ?)",
                     ['PRD001', 'Impresora Laser', 'Impresora de alta velocidad', 15.5]);
