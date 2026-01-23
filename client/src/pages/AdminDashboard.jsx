@@ -13,7 +13,7 @@ const AdminDashboard = () => {
     const [clientForm, setClientForm] = useState({ name: '', email: '', password: '' });
     const [productForm, setProductForm] = useState({ sku: '', name: '', description: '', weight: '' });
 
-    const [outboundModal, setOutboundModal] = useState({ isOpen: false, item: null, quantity: '' });
+    const [outboundModal, setOutboundModal] = useState({ isOpen: false, item: null, quantity: '', error: '', isSubmitting: false });
 
     useEffect(() => {
         if (activeTab === 'inventory') fetchInventory();
@@ -42,7 +42,7 @@ const AdminDashboard = () => {
 
     // Open Modal
     const handleOpenOutbound = (item) => {
-        setOutboundModal({ isOpen: true, item: item, quantity: '' });
+        setOutboundModal({ isOpen: true, item: item, quantity: '', error: '', isSubmitting: false });
     };
 
     // Confirm Withdrawal
@@ -51,9 +51,12 @@ const AdminDashboard = () => {
         const { item, quantity } = outboundModal;
         if (!item) return;
 
+        setOutboundModal(prev => ({ ...prev, error: '', isSubmitting: true }));
+
         const removeQty = parseInt(quantity);
         if (isNaN(removeQty) || removeQty <= 0 || removeQty > item.quantity) {
-            return alert('Cantidad inválida');
+            setOutboundModal(prev => ({ ...prev, error: 'Cantidad inválida (mayor al stock o 0).', isSubmitting: false }));
+            return;
         }
 
         try {
@@ -62,10 +65,11 @@ const AdminDashboard = () => {
                 location: item.location,
                 pallet_type: item.pallet_type
             });
-            fetchInventory();
-            setOutboundModal({ isOpen: false, item: null, quantity: '' });
+            await fetchInventory();
+            setOutboundModal({ isOpen: false, item: null, quantity: '', error: '', isSubmitting: false });
         } catch (err) {
-            alert('Error outbound');
+            console.error(err);
+            setOutboundModal(prev => ({ ...prev, error: 'Error de conexión o servidor.', isSubmitting: false }));
         }
     };
 
@@ -272,13 +276,19 @@ const AdminDashboard = () => {
                 {/* MODAL DE RETIRO - FIXED POSITION */}
                 {outboundModal.isOpen && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOutboundModal({ ...outboundModal, isOpen: false })}></div>
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !outboundModal.isSubmitting && setOutboundModal({ ...outboundModal, isOpen: false })}></div>
                         <div className="relative glass-card w-full max-w-md p-6 rounded-xl border border-slate-700 shadow-2xl animate-fade-in">
                             <h3 className="text-xl font-bold text-white mb-2">Registrar Salida</h3>
                             <p className="text-sm text-slate-400 mb-6">
                                 Producto: <span className="text-indigo-400 font-mono">{outboundModal.item?.product_name}</span> <br />
                                 Stock Actual: <span className="text-emerald-400 font-bold">{outboundModal.item?.quantity}</span>
                             </p>
+
+                            {outboundModal.error && (
+                                <div className="mb-4 p-3 bg-red-400/10 border border-red-400/20 text-red-200 text-sm rounded-lg flex items-center">
+                                    ⚠️ {outboundModal.error}
+                                </div>
+                            )}
 
                             <form onSubmit={handleConfirmOutbound} className="space-y-4">
                                 <div className="space-y-2">
@@ -293,6 +303,7 @@ const AdminDashboard = () => {
                                         value={outboundModal.quantity}
                                         onChange={e => setOutboundModal({ ...outboundModal, quantity: e.target.value })}
                                         required
+                                        disabled={outboundModal.isSubmitting}
                                     />
                                 </div>
                                 <div className="flex gap-3 pt-2">
@@ -300,14 +311,20 @@ const AdminDashboard = () => {
                                         type="button"
                                         onClick={() => setOutboundModal({ ...outboundModal, isOpen: false })}
                                         className="flex-1 px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors text-sm font-medium"
+                                        disabled={outboundModal.isSubmitting}
                                     >
                                         Cancelar
                                     </button>
                                     <button
                                         type="submit"
-                                        className="flex-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/20 text-sm font-bold transition-all"
+                                        className={`flex-1 px-4 py-2 rounded-lg text-white shadow-lg text-sm font-bold transition-all flex justify-center items-center gap-2 ${outboundModal.isSubmitting ? 'bg-slate-600 cursor-not-allowed' : 'bg-red-600 hover:bg-red-500 shadow-red-900/20'}`}
+                                        disabled={outboundModal.isSubmitting}
                                     >
-                                        Confirmar Salida
+                                        {outboundModal.isSubmitting ? (
+                                            <>Processing...</>
+                                        ) : (
+                                            <>Confirmar Salida</>
+                                        )}
                                     </button>
                                 </div>
                             </form>
