@@ -153,6 +153,41 @@ app.post('/api/admin/products', authenticateToken, (req, res) => {
         });
 });
 
+// Update Product
+app.put('/api/admin/products/:id', authenticateToken, (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    const id = req.params.id;
+    const { sku, name, description, weight } = req.body;
+
+    db.run("UPDATE products SET sku = ?, name = ?, description = ?, weight = ? WHERE id = ?",
+        [sku, name, description, weight, id], function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ message: "Product updated" });
+        });
+});
+
+// Delete Product
+// Delete Product
+app.delete('/api/admin/products/:id', authenticateToken, (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    const id = req.params.id;
+
+    // Check if inventory depends on this product before deleting.
+    db.get("SELECT count(*) as count FROM inventory WHERE product_id = ?", [id], (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+
+        if (row && row.count > 0) {
+            return res.status(400).json({ error: "No se puede eliminar el producto porque tiene stock asociado. Elimine el stock primero." });
+        }
+
+        // If no inventory, proceed to delete
+        db.run("DELETE FROM products WHERE id = ?", [id], function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ message: "Product deleted" });
+        });
+    });
+});
+
 // Update Inventory (Move/Outbound)
 app.put('/api/admin/inventory/:id', authenticateToken, (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
@@ -185,7 +220,7 @@ app.get('/api/admin/resources', authenticateToken, (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         data.clients = clients;
 
-        db.all("SELECT id, name, sku FROM products", [], (err, products) => {
+        db.all("SELECT * FROM products", [], (err, products) => {
             if (err) return res.status(500).json({ error: err.message });
             data.products = products;
             res.json(data);
