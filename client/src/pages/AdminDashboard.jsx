@@ -3,12 +3,13 @@ import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import {
     Package, Users, LogOut, ArrowDownCircle, LayoutDashboard,
-    PlusCircle, ArrowRightCircle, Trash2, Pencil, Box
+    PlusCircle, ArrowRightCircle, Trash2, Pencil, Box, Menu, X
 } from 'lucide-react';
 
 const AdminDashboard = () => {
     const { logout, user } = useAuth();
     const [activeTab, setActiveTab] = useState('inventory');
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [inventory, setInventory] = useState([]);
     const [resources, setResources] = useState({ clients: [], products: [] });
 
@@ -23,6 +24,11 @@ const AdminDashboard = () => {
 
     // Modals
     const [outboundModal, setOutboundModal] = useState({ isOpen: false, item: null, quantity: '', error: '', isSubmitting: false });
+
+    // Close mobile menu when tab changes
+    useEffect(() => {
+        setMobileMenuOpen(false);
+    }, [activeTab]);
 
     useEffect(() => {
         if (activeTab === 'inventory') fetchInventory();
@@ -68,7 +74,6 @@ const AdminDashboard = () => {
             await api.delete(`/admin/products/${id}`);
             fetchResources();
         } catch (err) {
-            // Manejo de error específico del backend (ej: tiene stock)
             const msg = err.response?.data?.error || 'Error al eliminar producto';
             alert(msg);
         }
@@ -113,9 +118,9 @@ const AdminDashboard = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#0a0a0a] text-slate-100 flex font-sans">
-            {/* Sidebar */}
-            <aside className="w-64 border-r border-slate-800 bg-slate-950 p-6 flex flex-col hidden md:flex">
+        <div className="min-h-screen bg-[#0a0a0a] text-slate-100 flex flex-col md:flex-row font-sans">
+            {/* Sidebar (Desktop) */}
+            <aside className="w-64 border-r border-slate-800 bg-slate-950 p-6 flex-col hidden md:flex sticky top-0 h-screen">
                 <div className="flex items-center gap-3 mb-10 px-2">
                     <div className="p-2 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-lg">
                         <Package size={20} className="text-white" />
@@ -146,56 +151,84 @@ const AdminDashboard = () => {
             </aside>
 
             {/* Mobile Header */}
-            <div className="md:hidden fixed top-0 w-full bg-slate-950 border-b border-slate-800 p-4 flex justify-between items-center z-50">
-                <span className="font-bold">LogisticaAdmin</span>
-                <button onClick={logout}><LogOut size={20} /></button>
+            <div className="md:hidden fixed top-0 w-full bg-slate-950/95 backdrop-blur-md border-b border-slate-800 p-4 flex justify-between items-center z-50">
+                <div className="flex items-center gap-3">
+                    <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 -ml-2 text-slate-300 hover:bg-slate-800 rounded-lg transition-colors">
+                        {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                    </button>
+                    <span className="font-bold text-lg">LogisticaAdmin</span>
+                </div>
+                <button onClick={logout} className="p-2 text-slate-400 hover:text-red-400 transition-colors"><LogOut size={20} /></button>
             </div>
 
+            {/* Mobile Navigation Overlay */}
+            {mobileMenuOpen && (
+                <div className="fixed inset-0 z-40 bg-slate-950 pt-20 px-6 md:hidden animate-fade-in">
+                    <nav className="space-y-2">
+                        <SidebarItem active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} icon={<LayoutDashboard size={20} />} label="Inventario Global" />
+                        <SidebarItem active={activeTab === 'inbound'} onClick={() => setActiveTab('inbound')} icon={<ArrowDownCircle size={20} />} label="Ingreso Mercadería" />
+                        <SidebarItem active={activeTab === 'products'} onClick={() => setActiveTab('products')} icon={<Box size={20} />} label="Gestión Productos" />
+                        <SidebarItem active={activeTab === 'clients'} onClick={() => setActiveTab('clients')} icon={<Users size={20} />} label="Gestión Clientes" />
+                    </nav>
+                    <div className="mt-8 pt-8 border-t border-slate-800">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-slate-700 to-slate-600 flex items-center justify-center font-bold">
+                                {user?.name?.[0] || 'A'}
+                            </div>
+                            <div>
+                                <p className="font-medium text-slate-200">{user?.name}</p>
+                                <p className="text-xs text-slate-500">Administrador</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Main Content */}
-            <main className="flex-1 p-6 md:p-10 pt-20 md:pt-10 overflow-auto relative">
+            <main className="flex-1 p-4 md:p-10 pt-24 md:pt-10 overflow-x-hidden w-full">
                 <div className="max-w-6xl mx-auto animate-fade-in">
-                    <header className="mb-8">
-                        <h1 className="text-3xl font-bold text-white mb-2">
+                    <header className="mb-6 md:mb-8">
+                        <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
                             {activeTab === 'inventory' && 'Inventario Global'}
                             {activeTab === 'inbound' && 'Ingreso de Mercadería'}
                             {activeTab === 'products' && 'Gestión de Productos'}
                             {activeTab === 'clients' && 'Gestión de Clientes'}
                         </h1>
-                        <p className="text-slate-400">Administra el stock y los recursos del sistema.</p>
+                        <p className="text-sm md:text-base text-slate-400">Administra el stock y los recursos del sistema.</p>
                     </header>
 
                     {/* --- TAB: INVENTORY --- */}
                     {activeTab === 'inventory' && (
                         <div className="glass-card rounded-xl overflow-hidden shadow-2xl">
                             <div className="overflow-x-auto">
-                                <table className="w-full text-left">
+                                <table className="w-full text-left whitespace-nowrap">
                                     <thead>
                                         <tr className="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider bg-slate-900/50">
-                                            <th className="p-5 font-semibold">Producto</th>
-                                            <th className="p-5 font-semibold">SKU</th>
-                                            <th className="p-5 font-semibold">Cliente</th>
-                                            <th className="p-5 font-semibold">Ubicación</th>
-                                            <th className="p-5 font-semibold text-right">Cantidad</th>
-                                            <th className="p-5 font-semibold text-right">Acciones</th>
+                                            <th className="p-4 md:p-5 font-semibold">Producto</th>
+                                            <th className="p-4 md:p-5 font-semibold">SKU</th>
+                                            <th className="p-4 md:p-5 font-semibold">Cliente</th>
+                                            <th className="p-4 md:p-5 font-semibold">Ubicación</th>
+                                            <th className="p-4 md:p-5 font-semibold text-right">Cantidad</th>
+                                            <th className="p-4 md:p-5 font-semibold text-right">Acciones</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-800">
                                         {inventory.map(item => (
                                             <tr key={item.id} className="hover:bg-slate-800/30 transition-colors group">
-                                                <td className="p-5 font-medium text-slate-200 flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-slate-500"><Package size={16} /></div>
+                                                <td className="p-4 md:p-5 font-medium text-slate-200 flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-slate-500 flex-shrink-0"><Package size={16} /></div>
                                                     {item.product_name}
                                                 </td>
-                                                <td className="p-5 text-sm text-slate-500 font-mono">{item.sku}</td>
-                                                <td className="p-5 text-sm text-slate-300">
+                                                <td className="p-4 md:p-5 text-sm text-slate-500 font-mono">{item.sku}</td>
+                                                <td className="p-4 md:p-5 text-sm text-slate-300">
                                                     <span className="px-2 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs">{item.client_name}</span>
                                                 </td>
-                                                <td className="p-5 text-sm">
+                                                <td className="p-4 md:p-5 text-sm">
                                                     <span className="text-indigo-400 font-medium">{item.location}</span>
                                                     <span className="text-slate-600 text-xs ml-2">({item.pallet_type})</span>
                                                 </td>
-                                                <td className="p-5 text-right font-bold text-emerald-400">{item.quantity}</td>
-                                                <td className="p-5 text-right">
+                                                <td className="p-4 md:p-5 text-right font-bold text-emerald-400">{item.quantity}</td>
+                                                <td className="p-4 md:p-5 text-right">
                                                     <button onClick={() => handleOpenOutbound(item)} className="text-slate-500 hover:text-red-400 transition-colors p-2 rounded -mr-2 bg-transparent hover:bg-white/5" title="Retirar Salida">
                                                         <ArrowRightCircle size={18} />
                                                     </button>
@@ -210,7 +243,7 @@ const AdminDashboard = () => {
 
                     {/* --- TAB: INBOUND --- */}
                     {activeTab === 'inbound' && (
-                        <div className="glass-card max-w-2xl mx-auto rounded-xl p-8 border border-slate-800">
+                        <div className="glass-card max-w-2xl mx-auto rounded-xl p-6 md:p-8 border border-slate-800">
                             <form onSubmit={handleInbound} className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2">
@@ -228,7 +261,7 @@ const AdminDashboard = () => {
                                         </select>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="space-y-2 col-span-1">
                                         <label className="text-xs font-bold text-slate-400 uppercase">Cantidad</label>
                                         <input type="number" className="input-field" value={inboundForm.quantity} onChange={e => setInboundForm({ ...inboundForm, quantity: e.target.value })} required />
@@ -246,7 +279,7 @@ const AdminDashboard = () => {
                                         </select>
                                     </div>
                                 </div>
-                                <button type="submit" className="btn-primary flex items-center justify-center gap-2">
+                                <button type="submit" className="btn-primary flex items-center justify-center gap-2 w-full">
                                     <PlusCircle size={18} /> <span>Registrar Entrada</span>
                                 </button>
                             </form>
@@ -256,7 +289,7 @@ const AdminDashboard = () => {
                     {/* --- TAB: PRODUCTS (UPDATED) --- */}
                     {activeTab === 'products' && (
                         <div className="space-y-6">
-                            <div className="glass-card max-w-4xl mx-auto rounded-xl p-8 border border-slate-800">
+                            <div className="glass-card max-w-4xl mx-auto rounded-xl p-6 md:p-8 border border-slate-800">
                                 <h3 className="text-xl font-bold mb-6 text-white flex items-center gap-2"><PlusCircle size={20} /> Nuevo Producto</h3>
                                 <form onSubmit={handleCreateProduct} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
@@ -285,24 +318,24 @@ const AdminDashboard = () => {
                             <div className="glass-card max-w-4xl mx-auto rounded-xl overflow-hidden border border-slate-800">
                                 <div className="p-4 border-b border-slate-800 bg-slate-900/50"><h3 className="font-bold text-white">Catálogo de Productos</h3></div>
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-left">
+                                    <table className="w-full text-left whitespace-nowrap">
                                         <thead>
                                             <tr className="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider bg-slate-900/50">
-                                                <th className="p-4 font-semibold">SKU</th>
-                                                <th className="p-4 font-semibold">Nombre</th>
-                                                <th className="p-4 font-semibold">Descripción</th>
-                                                <th className="p-4 font-semibold">Peso</th>
-                                                <th className="p-4 font-semibold text-right">Acciones</th>
+                                                <th className="p-4 md:p-5 font-semibold">SKU</th>
+                                                <th className="p-4 md:p-5 font-semibold">Nombre</th>
+                                                <th className="p-4 md:p-5 font-semibold">Descripción</th>
+                                                <th className="p-4 md:p-5 font-semibold">Peso</th>
+                                                <th className="p-4 md:p-5 font-semibold text-right">Acciones</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-800">
                                             {resources.products.map(prod => (
                                                 <tr key={prod.id} className="hover:bg-slate-800/30 transition-colors">
-                                                    <td className="p-4 text-sm font-mono text-slate-400">{prod.sku}</td>
-                                                    <td className="p-4 font-medium text-slate-200">{prod.name}</td>
-                                                    <td className="p-4 text-sm text-slate-500 truncate max-w-xs">{prod.description || '-'}</td>
-                                                    <td className="p-4 text-sm text-slate-400">{prod.weight} kg</td>
-                                                    <td className="p-4 text-right flex justify-end gap-2">
+                                                    <td className="p-4 md:p-5 text-sm font-mono text-slate-400">{prod.sku}</td>
+                                                    <td className="p-4 md:p-5 font-medium text-slate-200">{prod.name}</td>
+                                                    <td className="p-4 md:p-5 text-sm text-slate-500 truncate max-w-xs">{prod.description || '-'}</td>
+                                                    <td className="p-4 md:p-5 text-sm text-slate-400">{prod.weight} kg</td>
+                                                    <td className="p-4 md:p-5 text-right flex justify-end gap-2">
                                                         <button onClick={() => setEditingProduct(prod)} className="p-2 rounded bg-slate-800 hover:bg-indigo-900/50 text-indigo-400 border border-slate-700 transition-colors"><Pencil size={14} /></button>
                                                         <button onClick={() => handleDeleteProduct(prod.id)} className="p-2 rounded bg-slate-800 hover:bg-red-900/50 text-red-400 border border-slate-700 transition-colors"><Trash2 size={14} /></button>
                                                     </td>
@@ -319,7 +352,7 @@ const AdminDashboard = () => {
                     {/* --- TAB: CLIENTS --- */}
                     {activeTab === 'clients' && (
                         <div className="space-y-6">
-                            <div className="glass-card max-w-4xl mx-auto rounded-xl p-8 border border-slate-800">
+                            <div className="glass-card max-w-4xl mx-auto rounded-xl p-6 md:p-8 border border-slate-800">
                                 <h3 className="text-xl font-bold mb-6 text-white flex items-center gap-2"><PlusCircle size={20} /> Nuevo Cliente</h3>
                                 <form onSubmit={handleCreateClient} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
@@ -346,22 +379,22 @@ const AdminDashboard = () => {
                             <div className="glass-card max-w-4xl mx-auto rounded-xl overflow-hidden border border-slate-800">
                                 <div className="p-4 border-b border-slate-800 bg-slate-900/50"><h3 className="font-bold text-white">Listado de Clientes</h3></div>
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-left">
+                                    <table className="w-full text-left whitespace-nowrap">
                                         <thead>
                                             <tr className="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider bg-slate-900/50">
-                                                <th className="p-4 font-semibold">Empresa</th>
-                                                <th className="p-4 font-semibold">CUIT</th>
-                                                <th className="p-4 font-semibold">Email</th>
-                                                <th className="p-4 font-semibold text-right">Acciones</th>
+                                                <th className="p-4 md:p-5 font-semibold">Empresa</th>
+                                                <th className="p-4 md:p-5 font-semibold">CUIT</th>
+                                                <th className="p-4 md:p-5 font-semibold">Email</th>
+                                                <th className="p-4 md:p-5 font-semibold text-right">Acciones</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-800">
                                             {resources.clients.map(client => (
                                                 <tr key={client.id} className="hover:bg-slate-800/30 transition-colors">
-                                                    <td className="p-4 font-medium text-slate-200">{client.name}</td>
-                                                    <td className="p-4 text-sm text-slate-400 font-mono">{client.cuit || '-'}</td>
-                                                    <td className="p-4 text-sm text-slate-400">{client.email}</td>
-                                                    <td className="p-4 text-right flex justify-end gap-2">
+                                                    <td className="p-4 md:p-5 font-medium text-slate-200">{client.name}</td>
+                                                    <td className="p-4 md:p-5 text-sm text-slate-400 font-mono">{client.cuit || '-'}</td>
+                                                    <td className="p-4 md:p-5 text-sm text-slate-400">{client.email}</td>
+                                                    <td className="p-4 md:p-5 text-right flex justify-end gap-2">
                                                         <button onClick={() => setEditingClient(client)} className="p-2 rounded bg-slate-800 hover:bg-indigo-900/50 text-indigo-400 border border-slate-700 transition-colors"><Pencil size={14} /></button>
                                                         <button onClick={() => handleDeleteClient(client.id)} className="p-2 rounded bg-slate-800 hover:bg-red-900/50 text-red-400 border border-slate-700 transition-colors"><Trash2 size={14} /></button>
                                                     </td>
