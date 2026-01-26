@@ -361,3 +361,4 @@
 [2026-01-26T13:43:37.095Z] PUT /api/admin/inventory/1
 [2026-01-26T13:43:37.102Z] GET /api/admin/inventory
 [2026-01-26T16:23:33.932Z] GET /api/admin/resources
+[2026-01-26T16:36:48.907Z] GET /api/admin/inventory

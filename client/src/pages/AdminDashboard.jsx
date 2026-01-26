@@ -1,25 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { Package, Users, LogOut, ArrowDownCircle, Search, LayoutDashboard, PlusCircle, ArrowRightCircle } from 'lucide-react';
+import {
+    Package, Users, LogOut, ArrowDownCircle, LayoutDashboard,
+    PlusCircle, ArrowRightCircle, Trash2, Pencil, Box
+} from 'lucide-react';
 
 const AdminDashboard = () => {
     const { logout, user } = useAuth();
     const [activeTab, setActiveTab] = useState('inventory');
     const [inventory, setInventory] = useState([]);
     const [resources, setResources] = useState({ clients: [], products: [] });
-    // Keep forms same as before just restyled
+
+    // Forms
     const [inboundForm, setInboundForm] = useState({ product_id: '', client_id: '', quantity: '', location: '', pallet_type: 'Standard' });
     const [clientForm, setClientForm] = useState({ name: '', email: '', password: '', cuit: '' });
-    const [editingClient, setEditingClient] = useState(null);
     const [productForm, setProductForm] = useState({ sku: '', name: '', description: '', weight: '' });
+
+    // Edit States
+    const [editingClient, setEditingClient] = useState(null);
     const [editingProduct, setEditingProduct] = useState(null);
 
+    // Modals
     const [outboundModal, setOutboundModal] = useState({ isOpen: false, item: null, quantity: '', error: '', isSubmitting: false });
 
     useEffect(() => {
         if (activeTab === 'inventory') fetchInventory();
-        if (activeTab === 'inbound') fetchResources();
+        if (activeTab === 'inbound' || activeTab === 'products' || activeTab === 'clients') fetchResources();
     }, [activeTab]);
 
     const fetchInventory = async () => {
@@ -29,14 +36,27 @@ const AdminDashboard = () => {
         try { const res = await api.get('/admin/resources'); setResources(res.data); } catch (err) { console.error(err); }
     };
 
+    // --- Handlers: Inbound ---
     const handleInbound = async (e) => {
         e.preventDefault();
         try { await api.post('/admin/inventory', inboundForm); alert('Mercadería ingresada!'); setInboundForm({ ...inboundForm, quantity: '', location: '' }); } catch (err) { alert('Error inbound'); }
     };
+
+    // --- Handlers: Clients ---
     const handleCreateClient = async (e) => {
         e.preventDefault();
-        try { await api.post('/admin/clients', clientForm); alert('Cliente creado!'); setClientForm({ name: '', email: '', password: '' }); } catch (err) { alert('Error creating client'); }
+        try { await api.post('/admin/clients', clientForm); alert('Cliente creado!'); setClientForm({ name: '', email: '', password: '', cuit: '' }); fetchResources(); } catch (err) { alert('Error creating client'); }
     };
+    const handleDeleteClient = async (id) => {
+        if (!confirm('¿Seguro que deseas eliminar este cliente?')) return;
+        try { await api.delete(`/admin/clients/${id}`); fetchResources(); } catch (err) { alert('Error al eliminar cliente'); }
+    };
+    const handleUpdateClient = async (e) => {
+        e.preventDefault();
+        try { await api.put(`/admin/clients/${editingClient.id}`, editingClient); setEditingClient(null); fetchResources(); } catch (err) { alert('Error al actualizar cliente'); }
+    };
+
+    // --- Handlers: Products (NEW) ---
     const handleCreateProduct = async (e) => {
         e.preventDefault();
         try { await api.post('/admin/products', productForm); alert('Producto creado!'); setProductForm({ sku: '', name: '', description: '', weight: '' }); fetchResources(); } catch (err) { alert('Error creating product'); }
@@ -48,8 +68,9 @@ const AdminDashboard = () => {
             await api.delete(`/admin/products/${id}`);
             fetchResources();
         } catch (err) {
-            if (err.response?.data?.error) alert(err.response.data.error);
-            else alert('Error al eliminar producto');
+            // Manejo de error específico del backend (ej: tiene stock)
+            const msg = err.response?.data?.error || 'Error al eliminar producto';
+            alert(msg);
         }
     };
 
@@ -64,46 +85,20 @@ const AdminDashboard = () => {
         }
     };
 
-    const handleDeleteClient = async (id) => {
-        if (!confirm('¿Seguro que deseas eliminar este cliente?')) return;
-        try {
-            await api.delete(`/admin/clients/${id}`);
-            fetchResources();
-        } catch (err) {
-            alert('Error al eliminar cliente');
-        }
-    };
-
-    const handleUpdateClient = async (e) => {
-        e.preventDefault();
-        try {
-            await api.put(`/admin/clients/${editingClient.id}`, editingClient);
-            setEditingClient(null);
-            fetchResources();
-        } catch (err) {
-            alert('Error al actualizar cliente');
-        }
-    };
-
-    // Open Modal
+    // --- Handlers: Outbound ---
     const handleOpenOutbound = (item) => {
         setOutboundModal({ isOpen: true, item: item, quantity: '', error: '', isSubmitting: false });
     };
-
-    // Confirm Withdrawal
     const handleConfirmOutbound = async (e) => {
         e.preventDefault();
         const { item, quantity } = outboundModal;
         if (!item) return;
-
         setOutboundModal(prev => ({ ...prev, error: '', isSubmitting: true }));
-
         const removeQty = parseInt(quantity);
         if (isNaN(removeQty) || removeQty <= 0 || removeQty > item.quantity) {
-            setOutboundModal(prev => ({ ...prev, error: 'Cantidad inválida (mayor al stock o 0).', isSubmitting: false }));
+            setOutboundModal(prev => ({ ...prev, error: 'Cantidad inválida.', isSubmitting: false }));
             return;
         }
-
         try {
             await api.put(`/admin/inventory/${item.id}`, {
                 quantity: item.quantity - removeQty,
@@ -113,8 +108,7 @@ const AdminDashboard = () => {
             await fetchInventory();
             setOutboundModal({ isOpen: false, item: null, quantity: '', error: '', isSubmitting: false });
         } catch (err) {
-            console.error(err);
-            setOutboundModal(prev => ({ ...prev, error: 'Error de conexión o servidor.', isSubmitting: false }));
+            setOutboundModal(prev => ({ ...prev, error: 'Error de conexión.', isSubmitting: false }));
         }
     };
 
@@ -128,14 +122,12 @@ const AdminDashboard = () => {
                     </div>
                     <span className="font-bold text-lg tracking-tight">LogisticaAdmin</span>
                 </div>
-
                 <nav className="space-y-1 flex-1">
                     <SidebarItem active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} icon={<LayoutDashboard size={20} />} label="Inventario Global" />
                     <SidebarItem active={activeTab === 'inbound'} onClick={() => setActiveTab('inbound')} icon={<ArrowDownCircle size={20} />} label="Ingreso Mercadería" />
-                    <SidebarItem active={activeTab === 'products'} onClick={() => setActiveTab('products')} icon={<Package size={20} />} label="Gestión Productos" />
+                    <SidebarItem active={activeTab === 'products'} onClick={() => setActiveTab('products')} icon={<Box size={20} />} label="Gestión Productos" />
                     <SidebarItem active={activeTab === 'clients'} onClick={() => setActiveTab('clients')} icon={<Users size={20} />} label="Gestión Clientes" />
                 </nav>
-
                 <div className="pt-6 border-t border-slate-800 mt-6">
                     <div className="flex items-center gap-3 px-3 py-2 mb-2">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-700 to-slate-600 flex items-center justify-center text-xs font-bold">
@@ -169,12 +161,12 @@ const AdminDashboard = () => {
                             {activeTab === 'products' && 'Gestión de Productos'}
                             {activeTab === 'clients' && 'Gestión de Clientes'}
                         </h1>
-                        <p className="text-slate-400">Administra el stock y los movimientos del depósito.</p>
+                        <p className="text-slate-400">Administra el stock y los recursos del sistema.</p>
                     </header>
 
+                    {/* --- TAB: INVENTORY --- */}
                     {activeTab === 'inventory' && (
                         <div className="glass-card rounded-xl overflow-hidden shadow-2xl">
-                            {/* Stats row can be added here */}
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left">
                                     <thead>
@@ -216,26 +208,21 @@ const AdminDashboard = () => {
                         </div>
                     )}
 
+                    {/* --- TAB: INBOUND --- */}
                     {activeTab === 'inbound' && (
                         <div className="glass-card max-w-2xl mx-auto rounded-xl p-8 border border-slate-800">
                             <form onSubmit={handleInbound} className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-400 uppercase">Cliente</label>
-                                        <select
-                                            className="input-field appearance-none"
-                                            value={inboundForm.client_id} onChange={e => setInboundForm({ ...inboundForm, client_id: e.target.value })} required
-                                        >
+                                        <select className="input-field appearance-none" value={inboundForm.client_id} onChange={e => setInboundForm({ ...inboundForm, client_id: e.target.value })} required>
                                             <option value="">Seleccionar Cliente</option>
                                             {resources.clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                         </select>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-400 uppercase">Producto</label>
-                                        <select
-                                            className="input-field appearance-none"
-                                            value={inboundForm.product_id} onChange={e => setInboundForm({ ...inboundForm, product_id: e.target.value })} required
-                                        >
+                                        <select className="input-field appearance-none" value={inboundForm.product_id} onChange={e => setInboundForm({ ...inboundForm, product_id: e.target.value })} required>
                                             <option value="">Seleccionar Producto</option>
                                             {resources.products.map(p => <option key={p.id} value={p.id}>{p.sku} - {p.name}</option>)}
                                         </select>
@@ -260,21 +247,80 @@ const AdminDashboard = () => {
                                     </div>
                                 </div>
                                 <button type="submit" className="btn-primary flex items-center justify-center gap-2">
-                                    <PlusCircle size={18} />
-                                    <span>Registrar Entrada</span>
+                                    <PlusCircle size={18} /> <span>Registrar Entrada</span>
                                 </button>
                             </form>
                         </div>
                     )}
 
+                    {/* --- TAB: PRODUCTS (UPDATED) --- */}
+                    {activeTab === 'products' && (
+                        <div className="space-y-6">
+                            <div className="glass-card max-w-4xl mx-auto rounded-xl p-8 border border-slate-800">
+                                <h3 className="text-xl font-bold mb-6 text-white flex items-center gap-2"><PlusCircle size={20} /> Nuevo Producto</h3>
+                                <form onSubmit={handleCreateProduct} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase">SKU</label>
+                                        <input type="text" className="input-field" value={productForm.sku} onChange={e => setProductForm({ ...productForm, sku: e.target.value })} required />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase">Nombre</label>
+                                        <input type="text" className="input-field" value={productForm.name} onChange={e => setProductForm({ ...productForm, name: e.target.value })} required />
+                                    </div>
+                                    <div className="space-y-2 md:col-span-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase">Descripción</label>
+                                        <input type="text" className="input-field" value={productForm.description} onChange={e => setProductForm({ ...productForm, description: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase">Peso (kg)</label>
+                                        <input type="number" step="0.1" className="input-field" value={productForm.weight} onChange={e => setProductForm({ ...productForm, weight: e.target.value })} required />
+                                    </div>
+                                    <div className="md:col-span-2 pt-2">
+                                        <button type="submit" className="btn-primary !bg-indigo-600 !from-indigo-600 !to-blue-600 hover:!from-indigo-500 w-full md:w-auto">Crear Producto</button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            {/* Products List Table */}
+                            <div className="glass-card max-w-4xl mx-auto rounded-xl overflow-hidden border border-slate-800">
+                                <div className="p-4 border-b border-slate-800 bg-slate-900/50"><h3 className="font-bold text-white">Catálogo de Productos</h3></div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider bg-slate-900/50">
+                                                <th className="p-4 font-semibold">SKU</th>
+                                                <th className="p-4 font-semibold">Nombre</th>
+                                                <th className="p-4 font-semibold">Descripción</th>
+                                                <th className="p-4 font-semibold">Peso</th>
+                                                <th className="p-4 font-semibold text-right">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-800">
+                                            {resources.products.map(prod => (
+                                                <tr key={prod.id} className="hover:bg-slate-800/30 transition-colors">
+                                                    <td className="p-4 text-sm font-mono text-slate-400">{prod.sku}</td>
+                                                    <td className="p-4 font-medium text-slate-200">{prod.name}</td>
+                                                    <td className="p-4 text-sm text-slate-500 truncate max-w-xs">{prod.description || '-'}</td>
+                                                    <td className="p-4 text-sm text-slate-400">{prod.weight} kg</td>
+                                                    <td className="p-4 text-right flex justify-end gap-2">
+                                                        <button onClick={() => setEditingProduct(prod)} className="p-2 rounded bg-slate-800 hover:bg-indigo-900/50 text-indigo-400 border border-slate-700 transition-colors"><Pencil size={14} /></button>
+                                                        <button onClick={() => handleDeleteProduct(prod.id)} className="p-2 rounded bg-slate-800 hover:bg-red-900/50 text-red-400 border border-slate-700 transition-colors"><Trash2 size={14} /></button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {resources.products.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-slate-500">No hay productos registrados.</td></tr>}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* --- TAB: CLIENTS --- */}
                     {activeTab === 'clients' && (
                         <div className="space-y-6">
-                            {/* Create Client Form */}
                             <div className="glass-card max-w-4xl mx-auto rounded-xl p-8 border border-slate-800">
-                                <h3 className="text-xl font-bold mb-6 text-white flex items-center gap-2">
-                                    <PlusCircle size={20} />
-                                    Nuevo Cliente
-                                </h3>
+                                <h3 className="text-xl font-bold mb-6 text-white flex items-center gap-2"><PlusCircle size={20} /> Nuevo Cliente</h3>
                                 <form onSubmit={handleCreateClient} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-400 uppercase">Nombre Empresa</label>
@@ -293,18 +339,12 @@ const AdminDashboard = () => {
                                         <input type="password" className="input-field" value={clientForm.password} onChange={e => setClientForm({ ...clientForm, password: e.target.value })} required />
                                     </div>
                                     <div className="md:col-span-2 pt-2">
-                                        <button type="submit" className="btn-primary !bg-emerald-600 !from-emerald-600 !to-teal-600 hover:!from-emerald-500 w-full md:w-auto">
-                                            Crear Cliente
-                                        </button>
+                                        <button type="submit" className="btn-primary !bg-emerald-600 !from-emerald-600 !to-teal-600 hover:!from-emerald-500 w-full md:w-auto">Crear Cliente</button>
                                     </div>
                                 </form>
                             </div>
-
-                            {/* Clients List Table */}
                             <div className="glass-card max-w-4xl mx-auto rounded-xl overflow-hidden border border-slate-800">
-                                <div className="p-4 border-b border-slate-800 bg-slate-900/50">
-                                    <h3 className="font-bold text-white">Listado de Clientes</h3>
-                                </div>
+                                <div className="p-4 border-b border-slate-800 bg-slate-900/50"><h3 className="font-bold text-white">Listado de Clientes</h3></div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left">
                                         <thead>
@@ -322,110 +362,12 @@ const AdminDashboard = () => {
                                                     <td className="p-4 text-sm text-slate-400 font-mono">{client.cuit || '-'}</td>
                                                     <td className="p-4 text-sm text-slate-400">{client.email}</td>
                                                     <td className="p-4 text-right flex justify-end gap-2">
-                                                        <button
-                                                            onClick={() => setEditingClient(client)}
-                                                            className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-indigo-400 text-xs font-medium border border-slate-700 transition-colors"
-                                                        >
-                                                            Editar
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteClient(client.id)}
-                                                            className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-red-400 text-xs font-medium border border-slate-700 transition-colors"
-                                                        >
-                                                            Eliminar
-                                                        </button>
+                                                        <button onClick={() => setEditingClient(client)} className="p-2 rounded bg-slate-800 hover:bg-indigo-900/50 text-indigo-400 border border-slate-700 transition-colors"><Pencil size={14} /></button>
+                                                        <button onClick={() => handleDeleteClient(client.id)} className="p-2 rounded bg-slate-800 hover:bg-red-900/50 text-red-400 border border-slate-700 transition-colors"><Trash2 size={14} /></button>
                                                     </td>
                                                 </tr>
                                             ))}
-                                            {resources.clients.length === 0 && (
-                                                <tr>
-                                                    <td colSpan="4" className="p-8 text-center text-slate-500">No hay clientes registrados.</td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'products' && (
-                        <div className="space-y-6">
-                            <div className="glass-card max-w-4xl mx-auto rounded-xl p-8 border border-slate-800">
-                                <h3 className="text-xl font-bold mb-6 text-white flex items-center gap-2">
-                                    <PlusCircle size={20} />
-                                    Nuevo Producto
-                                </h3>
-                                <form onSubmit={handleCreateProduct} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-400 uppercase">SKU</label>
-                                        <input type="text" className="input-field" value={productForm.sku} onChange={e => setProductForm({ ...productForm, sku: e.target.value })} required />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-400 uppercase">Nombre</label>
-                                        <input type="text" className="input-field" value={productForm.name} onChange={e => setProductForm({ ...productForm, name: e.target.value })} required />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-400 uppercase">Descripción</label>
-                                        <input type="text" className="input-field" value={productForm.description} onChange={e => setProductForm({ ...productForm, description: e.target.value })} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-400 uppercase">Peso (kg)</label>
-                                        <input type="number" step="0.1" className="input-field" value={productForm.weight} onChange={e => setProductForm({ ...productForm, weight: e.target.value })} required />
-                                    </div>
-                                    <div className="md:col-span-2 pt-2">
-                                        <button type="submit" className="btn-primary !bg-indigo-600 !from-indigo-600 !to-blue-600 hover:!from-indigo-500 w-full md:w-auto">
-                                            Crear Producto
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-
-                            {/* Products List Table */}
-                            <div className="glass-card max-w-4xl mx-auto rounded-xl overflow-hidden border border-slate-800">
-                                <div className="p-4 border-b border-slate-800 bg-slate-900/50">
-                                    <h3 className="font-bold text-white">Listado de Productos</h3>
-                                </div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left">
-                                        <thead>
-                                            <tr className="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider bg-slate-900/50">
-                                                <th className="p-4 font-semibold">SKU</th>
-                                                <th className="p-4 font-semibold">Producto</th>
-                                                <th className="p-4 font-semibold">Peso</th>
-                                                <th className="p-4 font-semibold text-right">Acciones</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-800">
-                                            {resources.products.map(product => (
-                                                <tr key={product.id} className="hover:bg-slate-800/30 transition-colors">
-                                                    <td className="p-4 text-sm text-slate-400 font-mono">{product.sku}</td>
-                                                    <td className="p-4 font-medium text-slate-200">
-                                                        {product.name}
-                                                        <div className="text-xs text-slate-500">{product.description}</div>
-                                                    </td>
-                                                    <td className="p-4 text-sm text-slate-400">{product.weight} kg</td>
-                                                    <td className="p-4 text-right flex justify-end gap-2">
-                                                        <button
-                                                            onClick={() => setEditingProduct(product)}
-                                                            className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-indigo-400 text-xs font-medium border border-slate-700 transition-colors"
-                                                        >
-                                                            Editar
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteProduct(product.id)}
-                                                            className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-red-400 text-xs font-medium border border-slate-700 transition-colors"
-                                                        >
-                                                            Eliminar
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {resources.products.length === 0 && (
-                                                <tr>
-                                                    <td colSpan="4" className="p-8 text-center text-slate-500">No hay productos registrados.</td>
-                                                </tr>
-                                            )}
+                                            {resources.clients.length === 0 && <tr><td colSpan="4" className="p-8 text-center text-slate-500">No hay clientes registrados.</td></tr>}
                                         </tbody>
                                     </table>
                                 </div>
@@ -434,7 +376,41 @@ const AdminDashboard = () => {
                     )}
                 </div>
 
-                {/* MODAL DE RETIRO - FIXED POSITION */}
+                {/* --- MODALS --- */}
+
+                {/* MODAL: EDIT PRODUCT */}
+                {editingProduct && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingProduct(null)}></div>
+                        <div className="relative glass-card w-full max-w-md p-6 rounded-xl border border-slate-700 shadow-2xl animate-fade-in">
+                            <h3 className="text-xl font-bold text-white mb-6">Editar Producto</h3>
+                            <form onSubmit={handleUpdateProduct} className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">SKU</label>
+                                    <input type="text" className="input-field" value={editingProduct.sku} onChange={e => setEditingProduct({ ...editingProduct, sku: e.target.value })} required />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Nombre</label>
+                                    <input type="text" className="input-field" value={editingProduct.name} onChange={e => setEditingProduct({ ...editingProduct, name: e.target.value })} required />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Descripción</label>
+                                    <input type="text" className="input-field" value={editingProduct.description || ''} onChange={e => setEditingProduct({ ...editingProduct, description: e.target.value })} />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Peso (kg)</label>
+                                    <input type="number" step="0.1" className="input-field" value={editingProduct.weight || ''} onChange={e => setEditingProduct({ ...editingProduct, weight: e.target.value })} required />
+                                </div>
+                                <div className="flex gap-3 pt-2">
+                                    <button type="button" onClick={() => setEditingProduct(null)} className="flex-1 px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors text-sm font-medium">Cancelar</button>
+                                    <button type="submit" className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-900/20 text-sm font-bold transition-all">Guardar Cambios</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* MODAL: OUTBOUND */}
                 {outboundModal.isOpen && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !outboundModal.isSubmitting && setOutboundModal({ ...outboundModal, isOpen: false })}></div>
@@ -444,56 +420,22 @@ const AdminDashboard = () => {
                                 Producto: <span className="text-indigo-400 font-mono">{outboundModal.item?.product_name}</span> <br />
                                 Stock Actual: <span className="text-emerald-400 font-bold">{outboundModal.item?.quantity}</span>
                             </p>
-
-                            {outboundModal.error && (
-                                <div className="mb-4 p-3 bg-red-400/10 border border-red-400/20 text-red-200 text-sm rounded-lg flex items-center">
-                                    ⚠️ {outboundModal.error}
-                                </div>
-                            )}
-
+                            {outboundModal.error && <div className="mb-4 p-3 bg-red-400/10 border border-red-400/20 text-red-200 text-sm rounded-lg flex items-center">⚠️ {outboundModal.error}</div>}
                             <form onSubmit={handleConfirmOutbound} className="space-y-4">
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-slate-400 uppercase">Cantidad a Retirar</label>
-                                    <input
-                                        type="number"
-                                        autoFocus
-                                        className="input-field text-lg"
-                                        placeholder="0"
-                                        max={outboundModal.item?.quantity}
-                                        min="1"
-                                        value={outboundModal.quantity}
-                                        onChange={e => setOutboundModal({ ...outboundModal, quantity: e.target.value })}
-                                        required
-                                        disabled={outboundModal.isSubmitting}
-                                    />
+                                    <input type="number" autoFocus className="input-field text-lg" placeholder="0" max={outboundModal.item?.quantity} min="1" value={outboundModal.quantity} onChange={e => setOutboundModal({ ...outboundModal, quantity: e.target.value })} required disabled={outboundModal.isSubmitting} />
                                 </div>
                                 <div className="flex gap-3 pt-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setOutboundModal({ ...outboundModal, isOpen: false })}
-                                        className="flex-1 px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors text-sm font-medium"
-                                        disabled={outboundModal.isSubmitting}
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className={`flex-1 px-4 py-2 rounded-lg text-white shadow-lg text-sm font-bold transition-all flex justify-center items-center gap-2 ${outboundModal.isSubmitting ? 'bg-slate-600 cursor-not-allowed' : 'bg-red-600 hover:bg-red-500 shadow-red-900/20'}`}
-                                        disabled={outboundModal.isSubmitting}
-                                    >
-                                        {outboundModal.isSubmitting ? (
-                                            <>Processing...</>
-                                        ) : (
-                                            <>Confirmar Salida</>
-                                        )}
-                                    </button>
+                                    <button type="button" onClick={() => setOutboundModal({ ...outboundModal, isOpen: false })} className="flex-1 px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors text-sm font-medium" disabled={outboundModal.isSubmitting}>Cancelar</button>
+                                    <button type="submit" className={`flex-1 px-4 py-2 rounded-lg text-white shadow-lg text-sm font-bold transition-all flex justify-center items-center gap-2 ${outboundModal.isSubmitting ? 'bg-slate-600 cursor-not-allowed' : 'bg-red-600 hover:bg-red-500 shadow-red-900/20'}`} disabled={outboundModal.isSubmitting}>{outboundModal.isSubmitting ? 'Procesando...' : 'Confirmar Salida'}</button>
                                 </div>
                             </form>
                         </div>
                     </div>
                 )}
 
-                {/* EDIT CLIENT MODAL */}
+                {/* MODAL: EDIT CLIENT */}
                 {editingClient && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingClient(null)}></div>
@@ -502,133 +444,31 @@ const AdminDashboard = () => {
                             <form onSubmit={handleUpdateClient} className="space-y-4">
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-slate-400 uppercase">Nombre</label>
-                                    <input
-                                        type="text"
-                                        className="input-field"
-                                        value={editingClient.name}
-                                        onChange={e => setEditingClient({ ...editingClient, name: e.target.value })}
-                                        required
-                                    />
+                                    <input type="text" className="input-field" value={editingClient.name} onChange={e => setEditingClient({ ...editingClient, name: e.target.value })} required />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-slate-400 uppercase">CUIT</label>
-                                    <input
-                                        type="text"
-                                        className="input-field"
-                                        value={editingClient.cuit || ''}
-                                        onChange={e => setEditingClient({ ...editingClient, cuit: e.target.value })}
-                                    />
+                                    <input type="text" className="input-field" value={editingClient.cuit || ''} onChange={e => setEditingClient({ ...editingClient, cuit: e.target.value })} />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-slate-400 uppercase">Email</label>
-                                    <input
-                                        type="email"
-                                        className="input-field"
-                                        value={editingClient.email}
-                                        onChange={e => setEditingClient({ ...editingClient, email: e.target.value })}
-                                        required
-                                    />
+                                    <input type="email" className="input-field" value={editingClient.email} onChange={e => setEditingClient({ ...editingClient, email: e.target.value })} required />
                                 </div>
                                 <div className="flex gap-3 pt-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setEditingClient(null)}
-                                        className="flex-1 px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors text-sm font-medium"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-900/20 text-sm font-bold transition-all"
-                                    >
-                                        Guardar Cambios
-                                    </button>
+                                    <button type="button" onClick={() => setEditingClient(null)} className="flex-1 px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors text-sm font-medium">Cancelar</button>
+                                    <button type="submit" className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-900/20 text-sm font-bold transition-all">Guardar Cambios</button>
                                 </div>
                             </form>
                         </div>
                     </div>
                 )}
-
-                {/* EDIT PRODUCT MODAL */}
-                {editingProduct && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingProduct(null)}></div>
-                        <div className="relative glass-card w-full max-w-md p-6 rounded-xl border border-slate-700 shadow-2xl animate-fade-in">
-                            <h3 className="text-xl font-bold text-white mb-6">Editar Producto</h3>
-                            <form onSubmit={handleUpdateProduct} className="space-y-4">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase">SKU</label>
-                                    <input
-                                        type="text"
-                                        className="input-field"
-                                        value={editingProduct.sku}
-                                        onChange={e => setEditingProduct({ ...editingProduct, sku: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase">Nombre</label>
-                                    <input
-                                        type="text"
-                                        className="input-field"
-                                        value={editingProduct.name}
-                                        onChange={e => setEditingProduct({ ...editingProduct, name: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase">Descripción</label>
-                                    <input
-                                        type="text"
-                                        className="input-field"
-                                        value={editingProduct.description || ''}
-                                        onChange={e => setEditingProduct({ ...editingProduct, description: e.target.value })}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase">Peso (kg)</label>
-                                    <input
-                                        type="number"
-                                        step="0.1"
-                                        className="input-field"
-                                        value={editingProduct.weight}
-                                        onChange={e => setEditingProduct({ ...editingProduct, weight: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                                <div className="flex gap-3 pt-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setEditingProduct(null)}
-                                        className="flex-1 px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors text-sm font-medium"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-900/20 text-sm font-bold transition-all"
-                                    >
-                                        Guardar Cambios
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
             </main>
         </div>
     );
 };
 
 const SidebarItem = ({ active, onClick, icon, label }) => (
-    <button
-        onClick={onClick}
-        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${active
-            ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-sm'
-            : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
-            }`}
-    >
+    <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${active ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-sm' : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'}`}>
         {icon}
         <span>{label}</span>
     </button>
